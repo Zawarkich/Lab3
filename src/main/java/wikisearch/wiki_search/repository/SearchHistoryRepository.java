@@ -7,4 +7,5 @@ import wikisearch.wiki_search.entity.SearchHistory;
 
 @Repository
 public interface SearchHistoryRepository extends JpaRepository<SearchHistory, Long> {
+    SearchHistory findBySearchTerm(String searchTerm);
 }

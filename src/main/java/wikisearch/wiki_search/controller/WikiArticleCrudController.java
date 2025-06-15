@@ -8,7 +8,11 @@ import wikisearch.wiki_search.repository.WikiArticleRepository;
 import wikisearch.wiki_search.cache.SimpleCache;
 import org.springframework.beans.factory.annotation.Autowired;
 import wikisearch.wiki_search.dto.WikiArticleDto;
+import wikisearch.wiki_search.repository.SearchHistoryRepository;
+import wikisearch.wiki_search.entity.SearchHistory;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -17,11 +21,13 @@ import java.util.stream.Collectors;
 public class WikiArticleCrudController {
     private final WikiArticleRepository articleRepo;
     private final SimpleCache cache;
+    private final SearchHistoryRepository historyRepo;
 
     @Autowired
-    public WikiArticleCrudController(WikiArticleRepository articleRepo, SimpleCache cache) {
+    public WikiArticleCrudController(WikiArticleRepository articleRepo, SimpleCache cache, SearchHistoryRepository historyRepo) {
         this.articleRepo = articleRepo;
         this.cache = cache;
+        this.historyRepo = historyRepo;
     }
 
     @GetMapping
@@ -64,8 +70,24 @@ public class WikiArticleCrudController {
         if (cached != null) {
             return cached;
         }
-        List<WikiArticleDto> result = articleRepo.findByTerm(term)
-            .stream()
+        // Поиск статей по названию
+        List<WikiArticle> articles = articleRepo.findByTerm(term);
+        // --- Заполнение истории поиска ---
+        if (!articles.isEmpty()) {
+            SearchHistory history = historyRepo.findBySearchTerm(term);
+            if (history == null) {
+                history = new SearchHistory();
+                history.setSearchTerm(term);
+                history.setTimestamp(LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+            }
+            // Привязываем найденные статьи к истории
+            for (WikiArticle article : articles) {
+                article.setHistory(history);
+            }
+            history.setArticles(articles);
+            historyRepo.save(history);
+        }
+        List<WikiArticleDto> result = articles.stream()
             .map(a -> new WikiArticleDto(a.getId(), a.getTitle(), a.getContent()))
             .collect(Collectors.toList());
         cache.put("term:" + term, result);
