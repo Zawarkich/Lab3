@@ -70,9 +70,7 @@ public class WikiArticleCrudController {
         if (cached != null) {
             return cached;
         }
-        // Поиск статей по названию
         List<WikiArticle> articles = articleRepo.findByTerm(term);
-        // --- Заполнение истории поиска ---
         if (!articles.isEmpty()) {
             SearchHistory history = historyRepo.findBySearchTerm(term);
             if (history == null) {
@@ -80,7 +78,6 @@ public class WikiArticleCrudController {
                 history.setSearchTerm(term);
                 history.setTimestamp(LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
             }
-            // Привязываем найденные статьи к истории
             for (WikiArticle article : articles) {
                 article.setHistory(history);
             }
