@@ -8,6 +8,6 @@ import wikisearch.wiki_search.entity.WikiArticle;
 import java.util.List;
 
 public interface WikiArticleRepository extends JpaRepository<WikiArticle, Long> {
-    @Query("SELECT a FROM WikiArticle a WHERE a.history.searchTerm LIKE %:searchTerm%")
-    List<WikiArticle> findBySearchHistoryTerm(@Param("searchTerm") String searchTerm);
+    @Query("SELECT a FROM WikiArticle a WHERE a.title LIKE %:term%")
+    List<WikiArticle> findByTerm(@Param("term") String term);
 }

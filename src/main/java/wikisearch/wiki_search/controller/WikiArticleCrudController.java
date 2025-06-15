@@ -1,11 +1,16 @@
 package wikisearch.wiki_search.controller;
 
 import org.springframework.web.bind.annotation.*;
+
+import jakarta.transaction.Transactional;
 import wikisearch.wiki_search.entity.WikiArticle;
 import wikisearch.wiki_search.repository.WikiArticleRepository;
 import wikisearch.wiki_search.cache.SimpleCache;
 import org.springframework.beans.factory.annotation.Autowired;
+import wikisearch.wiki_search.dto.WikiArticleDto;
+
 import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/articles")
@@ -20,24 +25,30 @@ public class WikiArticleCrudController {
     }
 
     @GetMapping
-    public List<WikiArticle> getAll() {
-        return articleRepo.findAll();
+    public List<WikiArticleDto> getAll() {
+        return articleRepo.findAll().stream()
+            .map(a -> new WikiArticleDto(a.getId(), a.getTitle(), a.getContent()))
+            .collect(Collectors.toList());
     }
 
     @GetMapping("/{id}")
-    public WikiArticle getById(@PathVariable Long id) {
-        return articleRepo.findById(id).orElse(null);
+    public WikiArticleDto getById(@PathVariable Long id) {
+        return articleRepo.findById(id)
+            .map(a -> new WikiArticleDto(a.getId(), a.getTitle(), a.getContent()))
+            .orElse(null);
     }
 
     @PostMapping
-    public WikiArticle create(@RequestBody WikiArticle article) {
-        return articleRepo.save(article);
+    public WikiArticleDto create(@RequestBody WikiArticle article) {
+        WikiArticle saved = articleRepo.save(article);
+        return new WikiArticleDto(saved.getId(), saved.getTitle(), saved.getContent());
     }
 
     @PutMapping("/{id}")
-    public WikiArticle update(@PathVariable Long id, @RequestBody WikiArticle article) {
+    public WikiArticleDto update(@PathVariable Long id, @RequestBody WikiArticle article) {
         article.setId(id);
-        return articleRepo.save(article);
+        WikiArticle saved = articleRepo.save(article);
+        return new WikiArticleDto(saved.getId(), saved.getTitle(), saved.getContent());
     }
 
     @DeleteMapping("/{id}")
@@ -45,15 +56,19 @@ public class WikiArticleCrudController {
         articleRepo.deleteById(id);
     }
 
-    @GetMapping("/by-history-term")
-    public List<WikiArticle> getByHistoryTerm(@RequestParam String term) {
+    @Transactional
+    @GetMapping("/by-term")
+    public List<WikiArticleDto> getByTerm(@RequestParam String term) {
         @SuppressWarnings("unchecked")
-        List<WikiArticle> cached = (List<WikiArticle>) cache.get(term);
+        List<WikiArticleDto> cached = (List<WikiArticleDto>) cache.get("term:" + term);
         if (cached != null) {
             return cached;
         }
-        List<WikiArticle> result = articleRepo.findBySearchHistoryTerm(term);
-        cache.put(term, result);
+        List<WikiArticleDto> result = articleRepo.findByTerm(term)
+            .stream()
+            .map(a -> new WikiArticleDto(a.getId(), a.getTitle(), a.getContent()))
+            .collect(Collectors.toList());
+        cache.put("term:" + term, result);
         return result;
     }
 }
