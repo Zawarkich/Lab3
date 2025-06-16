@@ -2,67 +2,52 @@ package wikisearch.wiki_search.controller;
 
 import org.springframework.web.bind.annotation.*;
 
-import jakarta.transaction.Transactional;
-import wikisearch.wiki_search.entity.WikiArticle;
-import wikisearch.wiki_search.repository.WikiArticleRepository;
-import wikisearch.wiki_search.cache.SimpleCache;
-import org.springframework.beans.factory.annotation.Autowired;
 import wikisearch.wiki_search.dto.WikiArticleDto;
-import wikisearch.wiki_search.repository.SearchHistoryRepository;
-import wikisearch.wiki_search.entity.SearchHistory;
+import wikisearch.wiki_search.service.WikiService;
+import wikisearch.wiki_search.cache.SimpleCache;
+import wikisearch.wiki_search.entity.WikiArticle;
 
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
+import org.springframework.beans.factory.annotation.Autowired;
+
 import java.util.List;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/articles")
 public class WikiArticleCrudController {
-    private final WikiArticleRepository articleRepo;
+    private final WikiService wikiService;
     private final SimpleCache cache;
-    private final SearchHistoryRepository historyRepo;
 
     @Autowired
-    public WikiArticleCrudController(WikiArticleRepository articleRepo, SimpleCache cache, SearchHistoryRepository historyRepo) {
-        this.articleRepo = articleRepo;
+    public WikiArticleCrudController(WikiService wikiService, SimpleCache cache) {
+        this.wikiService = wikiService;
         this.cache = cache;
-        this.historyRepo = historyRepo;
     }
 
     @GetMapping
     public List<WikiArticleDto> getAll() {
-        return articleRepo.findAll().stream()
-            .map(a -> new WikiArticleDto(a.getId(), a.getTitle(), a.getContent()))
-            .collect(Collectors.toList());
+        return wikiService.getAllArticles();
     }
 
     @GetMapping("/{id}")
     public WikiArticleDto getById(@PathVariable Long id) {
-        return articleRepo.findById(id)
-            .map(a -> new WikiArticleDto(a.getId(), a.getTitle(), a.getContent()))
-            .orElse(null);
+        return wikiService.getArticleById(id);
     }
 
     @PostMapping
     public WikiArticleDto create(@RequestBody WikiArticle article) {
-        WikiArticle saved = articleRepo.save(article);
-        return new WikiArticleDto(saved.getId(), saved.getTitle(), saved.getContent());
+        return wikiService.createArticle(article);
     }
 
     @PutMapping("/{id}")
     public WikiArticleDto update(@PathVariable Long id, @RequestBody WikiArticle article) {
-        article.setId(id);
-        WikiArticle saved = articleRepo.save(article);
-        return new WikiArticleDto(saved.getId(), saved.getTitle(), saved.getContent());
+        return wikiService.updateArticle(id, article);
     }
 
     @DeleteMapping("/{id}")
     public void delete(@PathVariable Long id) {
-        articleRepo.deleteById(id);
+        wikiService.deleteArticle(id);
     }
 
-    @Transactional
     @GetMapping("/by-term")
     public List<WikiArticleDto> getByTerm(@RequestParam String term) {
         @SuppressWarnings("unchecked")
@@ -70,23 +55,7 @@ public class WikiArticleCrudController {
         if (cached != null) {
             return cached;
         }
-        List<WikiArticle> articles = articleRepo.findByTerm(term);
-        if (!articles.isEmpty()) {
-            SearchHistory history = historyRepo.findBySearchTerm(term);
-            if (history == null) {
-                history = new SearchHistory();
-                history.setSearchTerm(term);
-                history.setTimestamp(LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
-            }
-            for (WikiArticle article : articles) {
-                article.setHistory(history);
-            }
-            history.setArticles(articles);
-            historyRepo.save(history);
-        }
-        List<WikiArticleDto> result = articles.stream()
-            .map(a -> new WikiArticleDto(a.getId(), a.getTitle(), a.getContent()))
-            .collect(Collectors.toList());
+        List<WikiArticleDto> result = wikiService.findByTermAndSaveHistory(term);
         cache.put("term:" + term, result);
         return result;
     }

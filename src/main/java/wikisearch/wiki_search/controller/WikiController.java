@@ -1,6 +1,6 @@
 package wikisearch.wiki_search.controller;
 
-import wikisearch.wiki_search.entity.WikiArticle;
+import wikisearch.wiki_search.dto.WikiArticleDto;
 import wikisearch.wiki_search.service.WikiService;
 import org.springframework.web.bind.annotation.*;
 
@@ -14,7 +14,7 @@ public class WikiController {
     }
 
     @GetMapping("/search")
-    public WikiArticle search(@RequestParam String term) {
-        return wikiService.search(term);
+    public WikiArticleDto search(@RequestParam String term) {
+        return wikiService.searchAndSaveFromWiki(term);
     }
 }
