@@ -24,30 +24,49 @@ public class WikiService {
     }
 
     public List<WikiArticleDto> getAllArticles() {
-        return articleRepo.findAll().stream()
+        @SuppressWarnings("unchecked")
+        List<WikiArticleDto> cached = (List<WikiArticleDto>) cache.get("all_articles");
+        if (cached != null) {
+            return cached;
+        }
+        List<WikiArticleDto> result = articleRepo.findAll().stream()
             .map(a -> new WikiArticleDto(a.getId(), a.getTitle(), a.getContent()))
             .collect(Collectors.toList());
+        cache.put("all_articles", result);
+        return result;
     }
 
     public WikiArticleDto getArticleById(Long id) {
-        return articleRepo.findById(id)
+        String key = "article:" + id;
+        WikiArticleDto cached = (WikiArticleDto) cache.get(key);
+        if (cached != null) {
+            return cached;
+        }
+        WikiArticleDto result = articleRepo.findById(id)
             .map(a -> new WikiArticleDto(a.getId(), a.getTitle(), a.getContent()))
             .orElse(null);
+        if (result != null) {
+            cache.put(key, result);
+        }
+        return result;
     }
 
     public WikiArticleDto createArticle(WikiArticle article) {
         WikiArticle saved = articleRepo.save(article);
+        cache.clear();
         return new WikiArticleDto(saved.getId(), saved.getTitle(), saved.getContent());
     }
 
     public WikiArticleDto updateArticle(Long id, WikiArticle article) {
         article.setId(id);
         WikiArticle saved = articleRepo.save(article);
+        cache.clear();
         return new WikiArticleDto(saved.getId(), saved.getTitle(), saved.getContent());
     }
 
     public void deleteArticle(Long id) {
         articleRepo.deleteById(id);
+        cache.clear();
     }
 
     @Transactional
@@ -79,6 +98,11 @@ public class WikiService {
     }
 
     public WikiArticleDto searchAndSaveFromWiki(String term) {
+        String key = "wiki_search:" + term;
+        WikiArticleDto cached = (WikiArticleDto) cache.get(key);
+        if (cached != null) {
+            return cached;
+        }
         String url = "https://en.wikipedia.org/w/api.php?action=query&format=json&prop=extracts&exintro=true&explaintext=true&titles=" + term;
         String response = new RestTemplate().getForObject(url, String.class);
         String extract;
@@ -89,6 +113,8 @@ public class WikiService {
         }
         WikiArticle article = new WikiArticle(term, extract);
         WikiArticle saved = articleRepo.save(article);
-        return new WikiArticleDto(saved.getId(), saved.getTitle(), saved.getContent());
+        WikiArticleDto result = new WikiArticleDto(saved.getId(), saved.getTitle(), saved.getContent());
+        cache.put(key, result);
+        return result;
     }
 }
