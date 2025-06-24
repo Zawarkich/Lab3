@@ -52,19 +52,32 @@ public class WikiService {
     }
 
     public WikiArticleDto createArticle(WikiArticle article) {
+        WikiArticleDto cached = (WikiArticleDto) cache.get("article:new:" + article.getTitle());
+        if (cached != null) {
+            return cached;
+        }
         WikiArticle saved = articleRepo.save(article);
+        WikiArticleDto result = new WikiArticleDto(saved.getId(), saved.getTitle(), saved.getContent());
         cache.clear();
-        return new WikiArticleDto(saved.getId(), saved.getTitle(), saved.getContent());
+        cache.put("article:" + saved.getId(), result);
+        return result;
     }
 
     public WikiArticleDto updateArticle(Long id, WikiArticle article) {
+        WikiArticleDto cached = (WikiArticleDto) cache.get("article:" + id);
+        if (cached != null) {
+            return cached;
+        }
         article.setId(id);
         WikiArticle saved = articleRepo.save(article);
+        WikiArticleDto result = new WikiArticleDto(saved.getId(), saved.getTitle(), saved.getContent());
         cache.clear();
-        return new WikiArticleDto(saved.getId(), saved.getTitle(), saved.getContent());
+        cache.put("article:" + saved.getId(), result);
+        return result;
     }
 
     public void deleteArticle(Long id) {
+        cache.get("article:" + id);
         articleRepo.deleteById(id);
         cache.clear();
     }
